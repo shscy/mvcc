@@ -16,6 +16,7 @@ pub enum TxStatus {
     Active,
     Aborted,
     Committed,
+    RollBack,
 }
 
 impl Default for TxStatus {
@@ -63,6 +64,13 @@ impl<'a> Transaction<'a> {
         self.db.tx_manager.set_status(self.id, self.status);
         Ok(())
         // todo!()
+    }
+    pub fn rollback(&mut self) -> Result<()>{
+        self.status.ensure_is_active()?;
+        info!("tx {} rollback", self.id);
+        self.status = TxStatus::RollBack;
+        self.db.tx_manager.set_status(self.id, self.status);
+        Ok(())
     }
 
     pub fn id(&self) -> TxId {

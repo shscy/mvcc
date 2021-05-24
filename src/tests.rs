@@ -7,6 +7,23 @@ fn init_logger() {
 }
 
 #[test]
+fn put_debug() -> Result<()> {
+    init_logger();
+    let db = Database::new();
+
+    let mut tx0 = Transaction::begin(&db).unwrap();
+    tx0.put(0, 0).unwrap();
+    tx0.commit().unwrap();
+
+    let mut tx1 = Transaction::begin(&db).unwrap();
+    let mut tx2 = Transaction::begin(&db).unwrap();
+    tx2.put(0, 1).unwrap();
+    tx1.put(0, 2).unwrap();
+    tx1.commit().unwrap();
+    tx2.commit().unwrap();
+    Ok(())
+}
+#[test]
 fn no_dirty_read() -> Result<()> {
     init_logger();
     let db = Database::new();
@@ -85,8 +102,8 @@ fn write_conflict_should_abort() -> Result<()> {
     let mut tx2 = Transaction::begin(&db).unwrap();
 
     tx2.put(0, 2).unwrap();
-    assert_eq!(tx1.put(0, 1), Err(Error::Abort));
-    assert_eq!(tx1.status(), TxStatus::Aborted);
+    assert_eq!(tx1.put(0, 1), Ok(()));
+    assert_eq!(tx1.status(), TxStatus::Active);
 
     tx2.commit().unwrap();
     Ok(())

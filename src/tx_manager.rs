@@ -54,6 +54,7 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
+    // 在本事务之前产生的事务，且不在active_set集合中，那么肯定已经commit 或者rollback 了
     pub fn can_see(&self, txid: TxId) -> bool {
         debug!("{:?} can see {:?}?", self, txid);
         txid == self.txid || txid < self.txid && !self.active_set.contains(&txid)
