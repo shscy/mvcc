@@ -6,7 +6,6 @@ mod db;
 mod tests;
 mod tx;
 mod tx_manager;
-mod lock;
 
 pub use crate::db::Database;
 pub use crate::tx::{Transaction, TxId, TxStatus};

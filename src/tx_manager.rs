@@ -23,6 +23,8 @@ impl TxManager {
     /// Get current snapshot of a transaction.
     pub fn get_snapshot(&self, txid: TxId) -> Snapshot {
         let inner = self.inner.lock().unwrap();
+        self.inner.try_lock();
+
         Snapshot {
             txid,
             active_set: inner.active_set.clone(),

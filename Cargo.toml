@@ -8,6 +8,8 @@ edition = "2018"
 
 [dependencies]
 log = "0.4"
+rayon = "1.1"
+spinlock = {git = "https://github.com/zuoxiaoliang/spinlock.rs", rev = "61bad855"}
 
 [dev-dependencies]
 env_logger = "0.8"

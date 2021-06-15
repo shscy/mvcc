@@ -1,5 +1,6 @@
 use crate::{tx::*, tx_manager::*, Error, Result};
-use std::{collections::VecDeque, sync::Mutex, usize};
+use std::{collections::VecDeque,usize};
+use spinlock::SpinLock;
 
 pub struct Database {
     // fixed table for now
@@ -29,10 +30,16 @@ impl Database {
     }
 }
 
-#[derive(Default)]
 struct Versions {
     /// Old-to-new version list.
-    records: Mutex<VecDeque<Record>>,
+    records: SpinLock<VecDeque<Record>>,
+}
+impl Default for Versions {
+    fn default() -> Self { 
+        Versions{
+            records: SpinLock::new(VecDeque::new()),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -46,9 +53,9 @@ struct Record {
 
 impl Versions {
     // 1. 当对一个key进行多次put修改时 需要根据TxId 来找到上次修改的Record
-    fn put(&self, txid: TxId, data: usize, is_committed: impl Fn(TxId) -> bool) -> Result<()> {
+    fn put(&self, txid: TxId, data: usize, _: impl Fn(TxId) -> bool) -> Result<()> {
         trace!("put: txid={:?}, data={:?}", txid, data);
-        let mut records = self.records.lock().unwrap();
+        let mut records = self.records.write().unwrap();
         let mut find_rec: Option<&mut Record> = None;
         for item in records.iter_mut() {
             if item.tmin == txid {
@@ -70,7 +77,7 @@ impl Versions {
     }
 
     fn get(&self, can_see: impl Fn(TxId) -> bool, get_status: impl Fn(TxId) -> TxStatus) -> Result<usize> {
-        let records = self.records.lock().unwrap();
+        let records = self.records.read().unwrap();
         let mut max_tx_id = 0;
         let mut data  = 0;
         let mut status = false;
@@ -89,14 +96,15 @@ impl Versions {
         Err(Error::NotFound)
     }
 
+    #[allow(dead_code)]
     fn put_v2(&self, txid: TxId, data: usize, is_committed: impl Fn(TxId) -> bool) -> Result<()> {
         trace!("put: txid={:?}, data={:?}", txid, data);
-        let mut records = self.records.lock().unwrap();
+        debug!("intefeg {:?} fint {:?}", txid, data);
+        let mut records = self.records.write().unwrap();
         if let Some(record) = records.back_mut() {
             // WARNING 多个Transaction::begin 的顺序 和put函数的顺序可以是不一样的
             // 这个时候record.tmin >= txid 可能不满足
             if record.tmin >= txid {
-                println!("abriotttttttt");
                 return Err(Error::Abort);
             // 如果上一个事务已经执行完了， 上一个事务的maxid 就等于当前事务的id
             } else if is_committed(record.tmin) {
@@ -114,9 +122,10 @@ impl Versions {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn get_v2(&self, can_see: impl Fn(TxId) -> bool) -> Result<usize> {
         trace!("get:");
-        let records = self.records.lock().unwrap();
+        let records = self.records.read().unwrap();
         for record in records.iter().rev() {
             if can_see(record.tmin) {
                 return Ok(record.data);

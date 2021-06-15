@@ -1,5 +1,7 @@
 use super::*;
-use std::sync::Once;
+use std::sync::{Once, Arc, Mutex};
+use std::sync::atomic::AtomicU8;
+use std::thread::sleep;
 
 fn init_logger() {
     static INIT_LOGGER: Once = Once::new();
@@ -106,5 +108,32 @@ fn write_conflict_should_abort() -> Result<()> {
     assert_eq!(tx1.status(), TxStatus::Active);
 
     tx2.commit().unwrap();
+    Ok(())
+}
+
+
+#[test]
+fn rollback() -> Result<()> {
+    init_logger();
+    let db = Database::new();
+    {
+        let mut tx1 = Transaction::begin(&db).unwrap();
+        tx1.put(0, 1).unwrap();
+        tx1.commit().unwrap();
+    }
+    // tx1 rollback 
+    let mut tx1 = Transaction::begin(&db).unwrap();
+    let mut tx2 = Transaction::begin(&db).unwrap();
+    tx1.put(0, 2).unwrap();
+    tx2.put(1, 1).unwrap();
+    tx2.commit().unwrap();
+    tx1.rollback().unwrap();
+    assert_eq!(tx1.status(), TxStatus::RollBack);
+    assert_eq!(tx2.status(), TxStatus::Committed);
+    let mut txn = Transaction::begin(&db).unwrap();
+    let v1 = txn.get(0).unwrap();
+    let v2 = txn.get(1).unwrap();
+    assert_eq!(v1, 1);
+    assert_eq!(v2, 1);
     Ok(())
 }
